@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Setup — Vinyl Player</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%23b48cff' d='M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.3 1.02zm1.44-3.3c-.301.42-.841.6-1.26.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.2-1.26 9.6-5.88 13.38 1.62.36.42.18 1.02-.3 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.3c-.6.18-1.2-.18-1.38-.78-.18-.6.18-1.2.78-1.38 4.08-1.26 11.16-.96 15.66 1.68.54.3.72 1.02.42 1.56-.3.48-1.02.66-1.5 0z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+::-webkit-scrollbar { display: none; }
+html, body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  width:100vw; height:100vh; overflow:hidden;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background:#0f0d14; color:#fff;
+  user-select:none;
+}
+
+#drag-region {
+  position: fixed; top: 0; left: 0; right: 0; height: 40px;
+  -webkit-app-region: drag;
+  z-index: 9999;
+}
+
+#bg-glow {
+  position:fixed; inset:-20%;
+  background:
+    radial-gradient(circle at 25% 20%, rgba(180,140,255,0.22), transparent 50%),
+    radial-gradient(circle at 80% 85%, rgba(210,160,255,0.14), transparent 55%),
+    radial-gradient(circle at 50% 50%, rgba(140,100,220,0.08), transparent 60%);
+  filter:blur(80px);
+  transform:scale(1.1);
+  z-index:0; pointer-events:none;
+}
+
+#bg-overlay {
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  background:radial-gradient(circle at 50% 50%, transparent 0%, rgba(15,13,20,0.85) 100%),
+             linear-gradient(to bottom, rgba(15,13,20,0.3), rgba(15,13,20,0.95));
+}
+
+#wrap {
+  position:relative; z-index:10;
+  width:100%; height:100vh;
+  display:flex; flex-direction:column;
+  padding:44px 44px 32px 44px;
+}
+
+#progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(180,140,255,0.2);
+  transition: background 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dot.active {
+  background: #b48cff;
+  transform: scale(1.3);
+}
+.dot.done {
+  background: rgba(180,140,255,0.5);
+}
+
+#step-counter {
+  text-align: center;
+  font-size: 10.5px;
+  color: #6d6580;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+
+#slides {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20px 0;
+  opacity: 0;
+  transform: translateX(40px);
+  pointer-events: none;
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.slide.exit-left {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.slide-inner {
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+  text-align: center;
+}
+
+.slide-icon {
+  width: 64px; height: 64px;
+  margin: 0 auto 24px;
+  border-radius: 16px;
+  background: rgba(180,140,255,0.12);
+  display: flex; align-items: center; justify-content: center;
+  color: #b48cff;
+  border: 1px solid rgba(180,140,255,0.18);
+}
+.slide-icon .material-symbols-outlined { font-size: 32px; font-weight: 300; }
+
+.slide-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 12px;
+}
+.slide-title span { color: #b48cff; }
+
+.slide-subtitle {
+  font-size: 14px;
+  color: #8a8496;
+  line-height: 1.55;
+  max-width: 440px;
+  margin: 0 auto 28px;
+}
+
+.info-block {
+  background: rgba(180,140,255,0.05);
+  border: 1px solid rgba(180,140,255,0.15);
+  border-radius: 12px;
+  padding: 20px 22px;
+  max-width: 460px;
+  margin: 0 auto;
+  text-align: left;
+}
+.info-block p {
+  font-size: 13.5px;
+  color: #c9c1d6;
+  line-height: 1.6;
+}
+.info-block p + p { margin-top: 10px; }
+.info-block strong { color: #fff; font-weight: 600; }
+.info-block code {
+  background: rgba(180,140,255,0.12);
+  color: #d8c0ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'DM Sans', monospace;
+  font-size: 12.5px;
+}
+
+.steps-list {
+  text-align: left;
+  max-width: 460px;
+  margin: 0 auto;
+}
+.step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+}
+.step-num {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(180,140,255,0.15);
+  color: #b48cff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 1px;
+}
+.step-text {
+  font-size: 13.5px;
+  color: #c9c1d6;
+  line-height: 1.55;
+}
+.step-text strong { color: #fff; font-weight: 600; }
+
+.url-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(180,140,255,0.06);
+  border: 1px solid rgba(180,140,255,0.18);
+  border-radius: 10px;
+  padding: 12px 12px 12px 16px;
+  max-width: 460px;
+  margin: 0 auto;
+  font-family: 'DM Sans', monospace;
+  font-size: 13px;
+  color: #e0d5f5;
+  transition: border-color 0.2s ease;
+}
+.url-box:hover { border-color: rgba(180,140,255,0.4); }
+
+.url-text {
+  flex: 1;
+  text-align: left;
+  word-break: break-all;
+  letter-spacing: 0.01em;
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(180,140,255,0.15);
+  color: #b48cff;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+  position: relative;
+}
+.copy-btn:hover { background: rgba(180,140,255,0.25); }
+.copy-btn:active { transform: scale(0.92); }
+.copy-btn.copied { background: rgba(180,140,255,0.35); }
+.copy-btn .material-symbols-outlined { font-size: 16px; }
+
+.redirect-box {
+  margin: 16px auto 0;
+  background: rgba(180,140,255,0.08);
+  border: 1px solid rgba(180,140,255,0.25);
+  border-radius: 10px;
+  padding: 14px 12px 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'DM Sans', monospace;
+  font-size: 13px;
+  color: #e0d5f5;
+  max-width: 460px;
+}
+.redirect-box .url-text { flex: 1; text-align: left; word-break: break-all; }
+
+.input-wrap {
+  max-width: 460px;
+  margin: 0 auto;
+  position: relative;
+}
+.input-wrap input {
+  width: 100%;
+  background: rgba(180,140,255,0.06);
+  border: 1.5px solid rgba(180,140,255,0.18);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: 'DM Sans', monospace;
+  font-size: 13px;
+  color: #fff;
+  outline: none;
+  letter-spacing: 0.02em;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  -moz-appearance: textfield;
+}
+.input-wrap input::-webkit-outer-spin-button,
+.input-wrap input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.input-wrap input::placeholder { color: rgba(180,140,255,0.3); letter-spacing: normal; }
+.input-wrap input:focus {
+  border-color: #b48cff;
+  background: rgba(180,140,255,0.08);
+}
+.input-wrap input.invalid {
+  border-color: #ff5555;
+}
+.input-status {
+  position: absolute;
+  right: 14px; top: 50%;
+  transform: translateY(-50%);
+  color: #b48cff;
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.input-status.visible { opacity: 1; }
+.input-status.error { color: #ff5555; }
+
+.input-hint {
+  font-size: 11.5px;
+  color: #6d6580;
+  margin-top: 10px;
+  text-align: left;
+  max-width: 460px;
+  margin-left: auto;
+  margin-right: auto;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
+.settings-list {
+  max-width: 460px;
+  margin: 0 auto;
+  background: rgba(180,140,255,0.04);
+  border: 1px solid rgba(180,140,255,0.12);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  gap: 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+}
+.settings-row:hover { background: rgba(180,140,255,0.05); }
+.settings-row + .settings-row {
+  border-top: 1px solid rgba(180,140,255,0.08);
+}
+.settings-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.settings-row-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.005em;
+}
+.settings-row-desc {
+  font-size: 11.5px;
+  color: #8a8496;
+  line-height: 1.4;
+}
+
+.toggle {
+  position: relative;
+  width: 38px; height: 22px;
+  background: rgba(120,120,128,0.32);
+  border-radius: 11px;
+  flex-shrink: 0;
+  transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.35),
+    0 0 0 0.5px rgba(0,0,0,0.08),
+    inset 0 -0.5px 0 rgba(0,0,0,0.1);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toggle.on { background: #b48cff; }
+.toggle.on::after { transform: translateX(16px); }
+
+.cta {
+  margin-top: 28px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+.cta.stack {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.cta.stack .btn { width: 260px; }
+
+.btn {
+  padding: 12px 28px;
+  border-radius: 500px;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: -0.005em;
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  min-width: 140px;
+}
+.btn.primary {
+  background: linear-gradient(135deg, #c9a8ff 0%, #a884ff 50%, #8f68e8 100%);
+  color: #1a0f2e;
+  box-shadow: 0 4px 16px rgba(180,140,255,0.3);
+}
+.btn.primary:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 24px rgba(180,140,255,0.45);
+  filter: brightness(1.08);
+}
+.btn.primary:active { transform: scale(0.98); }
+.btn.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+  box-shadow: none;
+}
+.btn.ghost {
+  background: transparent;
+  color: #8a8496;
+  border: 1px solid rgba(180,140,255,0.15);
+}
+.btn.ghost:hover { color: #fff; border-color: rgba(180,140,255,0.4); }
+
+#done-check {
+  width: 80px; height: 80px;
+  margin: 0 auto 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c9a8ff, #8f68e8);
+  display: flex; align-items: center; justify-content: center;
+  color: #1a0f2e;
+  box-shadow: 0 8px 32px rgba(180,140,255,0.5);
+  animation: pop-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes pop-in {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+#done-check .material-symbols-outlined { font-size: 44px; font-weight: 700; }
+
+#loading {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,13,20,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+#loading.visible { display: flex; }
+
+#loading-spinner {
+  width: 32px; height: 32px;
+  border: 2.5px solid rgba(180,140,255,0.2);
+  border-top-color: #b48cff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#loading-text {
+  font-size: 13px;
+  color: #8a8496;
+  letter-spacing: 0.02em;
+}
+
+@media (max-height:700px) {
+  #wrap { padding: 36px 32px 24px 32px; }
+  .slide-icon { width: 52px; height: 52px; margin-bottom: 16px; }
+  .slide-icon .material-symbols-outlined { font-size: 26px; }
+  .slide-title { font-size: 22px; }
+  .slide-subtitle { font-size: 13px; margin-bottom: 20px; }
+  #step-counter { margin-bottom: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div id="drag-region"></div>
+
+<div id="bg-glow"></div>
+<div id="bg-overlay"></div>
+
+<div id="wrap">
+
+  <div id="progress">
+    <div class="dot active" data-step="0"></div>
+    <div class="dot" data-step="1"></div>
+    <div class="dot" data-step="2"></div>
+    <div class="dot" data-step="3"></div>
+    <div class="dot" data-step="4"></div>
+    <div class="dot" data-step="5"></div>
+    <div class="dot" data-step="6"></div>
+  </div>
+
+  <div id="step-counter">Step 1 of 7</div>
+
+  <div id="slides">
+
+    <!-- STAP 1: WELKOM -->
+    <div class="slide active" data-step="0">
+      <div class="slide-inner">
+        <div class="slide-icon">
+          <span class="material-symbols-outlined">album</span>
+        </div>
+        <div class="slide-title">Welcome to <span>Vinyl Player</span></div>
+        <div class="slide-subtitle">
+          Let's get you set up. This takes about 3 minutes and you only have to do it once.
+        </div>
+        <div class="cta">
+          <button class="btn primary" onclick="nextSlide()">Get started</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAP 2: POORT -->
+    <div class="slide" data-step="1">
+      <div class="slide-inner">
+        <div class="slide-icon">
+          <span class="material-symbols-outlined">lan</span>
+        </div>
+        <div class="slide-title">Choose a port</div>
+        <div class="slide-subtitle">
+          Vinyl Player runs a small local server. Pick any port between 1024 and 65535. We recommend <strong>3000</strong>.
+        </div>
+        <div class="input-wrap">
+          <input
+            type="number"
+            id="port-input"
+            placeholder="3000"
+            min="1024"
+            max="65535"
+            value="3000"
+            spellcheck="false"
+            autocomplete="off"
+          >
+          <div class="input-status" id="port-status">
+            <span class="material-symbols-outlined" id="port-status-icon">check_circle</span>
+          </div>
+        </div>
+        <div class="input-hint" id="port-hint">
+          Checking port availability…
+        </div>
+        <div class="cta">
+          <button class="btn ghost" onclick="prevSlide()">Back</button>
+          <button class="btn primary" id="port-next" onclick="nextSlide()" disabled>Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAP 3: OPEN DASHBOARD -->
+    <div class="slide" data-step="2">
+      <div class="slide-inner">
+        <div class="slide-icon">
+          <span class="material-symbols-outlined">open_in_new</span>
+        </div>
+        <div class="slide-title">Open the Spotify Dashboard</div>
+        <div class="slide-subtitle">
+          You're going to create your own free Spotify Developer app. This is what powers Vinyl Player.
+        </div>
+        <div class="info-block">
+          <p>Click the button below to open the <strong>Spotify Developer Dashboard</strong> in your browser.</p>
+          <p>Log in with the <strong>same Spotify account</strong> you use for music. You'll need a <strong>Premium</strong> account.</p>
+          <p>Once you're logged in, come back here and click Continue.</p>
+        </div>
+        <div class="cta stack">
+          <button class="btn primary" onclick="window.open('https://developer.spotify.com/dashboard', '_blank')">Open Dashboard</button>
+        </div>
+        <div class="cta">
+          <button class="btn ghost" onclick="prevSlide()">Back</button>
+          <button class="btn primary" onclick="nextSlide()">I'm logged in</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAP 4: CREATE APP -->
+    <div class="slide" data-step="3">
+      <div class="slide-inner">
+        <div class="slide-icon">
+          <span class="material-symbols-outlined">add_box</span>
+        </div>
+        <div class="slide-title">Create a new app</div>
+        <div class="slide-subtitle">
+          On the dashboard, click <strong>Create app</strong> and fill in the form.
+        </div>
+        <div class="steps-list">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-text"><strong>App name</strong> — anything you want, e.g. "My Vinyl Player".</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-text"><strong>App description</strong> — anything, e.g. "Personal music player".</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-text"><strong>Website</strong> — leave this blank.</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">4</div>
+            <div class="step-text"><strong>Redirect URI</strong> — click <strong>Add</strong> and paste this exact URL:</div>
+          </div>
+        </div>
+
+        <div class="redirect-box">
+          <div class="url-text" id="redirect-uri-display">http://127.0.0.1:3000/</div>
+          <button class="copy-btn" id="copy-redirect" title="Copy">
+            <span class="material-symbols-outlined">content_copy</span>
+          </button>
+        </div>
+
+        <div class="steps-list" style="margin-top: 14px;">
+          <div class="step-item">
+            <div class="step-num">5</div>
+            <div class="step-text"><strong>Which API/SDKs</strong> — check <strong>Web API</strong> only.</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">6</div>
+            <div class="step-text">Agree to the terms and click <strong>Save</strong>.</div>
+          </div>
+        </div>
+
+        <div class="input-hint" style="text-align: center; margin-top: 14px;">
+          ⚠️ Paste it exactly as shown. Spotify does not allow <code>localhost</code>, only <code>127.0.0.1</code>.
+        </div>
+
+        <div class="cta">
+          <button class="btn ghost" onclick="prevSlide()">Back</button>
+          <button class="btn primary" onclick="nextSlide()">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAP 5: CLIENT ID -->
+    <div class="slide" data-step="4">
+      <div class="slide-inner">
+        <div class="slide-icon">
+          <span class="material-symbols-outlined">key</span>
+        </div>
+        <div class="slide-title">Paste your Client ID</div>
+        <div class="slide-subtitle">
+          Go back to your app's page. Copy the <strong>Client ID</strong> and paste it below.
+        </div>
+        <div class="input-wrap">
+          <input
+            type="text"
+            id="client-id-input"
+            placeholder="Paste your Client ID here"
+            spellcheck="false"
+            autocomplete="off"
+          >
+          <div class="input-status" id="input-status">
+            <span class="material-symbols-outlined" id="input-status-icon">check_circle</span>
+          </div>
+        </div>
+        <div class="input-hint" id="client-id-hint">
+          You'll find this on your app's page, right under the app name.
+        </div>
+        <div class="cta">
+          <button class="btn ghost" onclick="prevSlide()">Back</button>
+          <button class="btn primary" id="client-next" onclick="nextSlide()" disabled>Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAP 6: SETTINGS -->
+    <div class="slide" data-step="5">
+      <div class="slide-inner">
+        <div class="slide-icon">
+          <span class="material-symbols-outlined">tune</span>
+        </div>
+        <div class="slide-title">App settings</div>
+        <div class="slide-subtitle">
+          Choose how Vinyl Player behaves. You can change all of these later in Settings.
+        </div>
+
+        <div class="settings-list">
+          <div class="settings-row" data-setting="showInDock">
+            <div class="settings-row-text">
+              <div class="settings-row-label">Show in Dock</div>
+              <div class="settings-row-desc">Display the app icon in your Dock</div>
+            </div>
+            <div class="toggle" data-setting="showInDock"></div>
+          </div>
+
+          <div class="settings-row" data-setting="startMinimized">
+            <div class="settings-row-text">
+              <div class="settings-row-label">Start Minimized</div>
+              <div class="settings-row-desc">Launch without showing the player window</div>
+            </div>
+            <div class="toggle" data-setting="startMinimized"></div>
+          </div>
+
+          <div class="settings-row" data-setting="launchAtLogin">
+            <div class="settings-row-text">
+              <div class="settings-row-label">Launch at Login</div>
+              <div class="settings-row-desc">Open Vinyl Player automatically when you log in</div>
+            </div>
+            <div class="toggle" data-setting="launchAtLogin"></div>
+          </div>
+        </div>
+
+        <div class="cta">
+          <button class="btn ghost" onclick="prevSlide()">Back</button>
+          <button class="btn primary" onclick="nextSlide()">Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAP 7: KLAAR -->
+    <div class="slide" data-step="6">
+      <div class="slide-inner">
+        <div id="done-check">
+          <span class="material-symbols-outlined">check</span>
+        </div>
+        <div class="slide-title">You're all set</div>
+        <div class="slide-subtitle">
+          Vinyl Player is ready to go. Your local server runs on:
+        </div>
+        <div class="url-box" style="margin-bottom: 12px;">
+          <div class="url-text" id="final-url-display">http://127.0.0.1:3000/</div>
+          <button class="copy-btn" id="copy-final" title="Copy">
+            <span class="material-symbols-outlined">content_copy</span>
+          </button>
+        </div>
+        <div class="cta">
+          <button class="btn primary" id="finish-btn" onclick="finishSetup()">Open Vinyl Player</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="loading">
+  <div id="loading-spinner"></div>
+  <div id="loading-text">Starting Vinyl Player…</div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────
+let currentStep = 0;
+const totalSteps = 7;
+
+let selectedPort = 3000;
+let portAvailable = false;
+let portCheckTimer = null;
+let clientId = '';
+
+const settings = {
+  showInDock: true,
+  startMinimized: false,
+  launchAtLogin: false
+};
+
+// ── Init ─────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    if (window.electronAPI && window.electronAPI.getSetupInfo) {
+      const info = await window.electronAPI.getSetupInfo();
+      if (info) {
+        if (info.port) {
+          selectedPort = info.port;
+          document.getElementById('port-input').value = info.port;
+        }
+        if (typeof info.clientId === 'string' && info.clientId.length > 0) {
+          clientId = info.clientId;
+          const input = document.getElementById('client-id-input');
+          input.value = info.clientId;
+          // Trigger validatie
+          input.dispatchEvent(new Event('input'));
+        }
+        if (typeof info.showInDock === 'boolean') settings.showInDock = info.showInDock;
+        if (typeof info.startMinimized === 'boolean') settings.startMinimized = info.startMinimized;
+        if (typeof info.launchAtLogin === 'boolean') settings.launchAtLogin = info.launchAtLogin;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load setup info:', e);
+  }
+
+  applySettingsToUI();
+  checkPortAvailability(selectedPort);
+  updateStepCounter();
+  updateRedirectUri();
+  setupSettingsRows();
+})();
+
+// ── Settings UI ──────────────────────────────────────────────────────────
+function applySettingsToUI() {
+  document.querySelectorAll('.settings-row').forEach(row => {
+    const key = row.dataset.setting;
+    const toggle = row.querySelector('.toggle');
+    if (!toggle) return;
+    if (settings[key]) {
+      toggle.classList.add('on');
+    } else {
+      toggle.classList.remove('on');
+    }
+  });
+}
+
+function setupSettingsRows() {
+  document.querySelectorAll('.settings-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const key = row.dataset.setting;
+      const toggle = row.querySelector('.toggle');
+      if (!toggle) return;
+
+      const newValue = !settings[key];
+      settings[key] = newValue;
+
+      if (newValue) {
+        toggle.classList.add('on');
+      } else {
+        toggle.classList.remove('on');
+      }
+
+      if (key === 'showInDock' && window.electronAPI && window.electronAPI.setDockVisibility) {
+        window.electronAPI.setDockVisibility(newValue);
+      }
+    });
+  });
+}
+
+// ── Slide navigation ─────────────────────────────────────────────────────
+function updateStepCounter() {
+  const el = document.getElementById('step-counter');
+  if (el) el.textContent = `Step ${currentStep + 1} of ${totalSteps}`;
+}
+
+function goToStep(step) {
+  if (step < 0 || step >= totalSteps) return;
+  if (step === currentStep) return;
+
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.querySelectorAll('.dot');
+
+  slides.forEach((s, i) => {
+    s.classList.remove('active', 'exit-left');
+    if (i === step) {
+      s.classList.add('active');
+    } else if (i < step) {
+      s.classList.add('exit-left');
+    }
+  });
+
+  dots.forEach((d, i) => {
+    d.classList.remove('active', 'done');
+    if (i === step) d.classList.add('active');
+    else if (i < step) d.classList.add('done');
+  });
+
+  currentStep = step;
+  updateStepCounter();
+}
+
+function nextSlide() {
+  if (currentStep === 1 && (!selectedPort || !portAvailable)) return;
+  if (currentStep === 4 && !isValidClientId(clientId)) return;
+  goToStep(currentStep + 1);
+}
+
+function prevSlide() {
+  goToStep(currentStep - 1);
+}
+
+// ── Poort validatie ──────────────────────────────────────────────────────
+const portInput = document.getElementById('port-input');
+const portNext = document.getElementById('port-next');
+const portStatus = document.getElementById('port-status');
+const portStatusIcon = document.getElementById('port-status-icon');
+const portHint = document.getElementById('port-hint');
+
+async function checkPortAvailability(port) {
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    portAvailable = false;
+    portInput.classList.add('invalid');
+    portStatus.classList.add('visible', 'error');
+    portStatusIcon.textContent = 'error';
+    portHint.textContent = 'Port must be between 1024 and 65535. Ports below 1024 require admin rights.';
+    portHint.style.color = '#ff5555';
+    portNext.disabled = true;
+    return;
+  }
+
+  let result = { available: true };
+  try {
+    if (window.electronAPI && window.electronAPI.checkPort) {
+      result = await window.electronAPI.checkPort(port);
+    }
+  } catch (e) {
+    result = { available: true };
+  }
+
+  if (result.available) {
+    portAvailable = true;
+    portInput.classList.remove('invalid');
+    portStatus.classList.add('visible');
+    portStatus.classList.remove('error');
+    portStatusIcon.textContent = 'check_circle';
+    portHint.textContent = `Port ${port} is available.`;
+    portHint.style.color = '#b48cff';
+    portNext.disabled = false;
+    updateRedirectUri();
+  } else {
+    portAvailable = false;
+    portInput.classList.add('invalid');
+    portStatus.classList.add('visible', 'error');
+    portStatusIcon.textContent = 'error';
+    portHint.textContent = `Port ${port} is already in use. Try another one.`;
+    portHint.style.color = '#ff5555';
+    portNext.disabled = true;
+  }
+}
+
+portInput.addEventListener('input', () => {
+  const val = parseInt(portInput.value, 10);
+  selectedPort = isNaN(val) ? null : val;
+
+  clearTimeout(portCheckTimer);
+  portCheckTimer = setTimeout(() => {
+    if (selectedPort !== null) {
+      checkPortAvailability(selectedPort);
+    } else {
+      portAvailable = false;
+      portNext.disabled = true;
+    }
+  }, 350);
+});
+
+// ── Redirect URI ─────────────────────────────────────────────────────────
+function getRedirectUri() {
+  const port = selectedPort || 3000;
+  return `http://127.0.0.1:${port}/`;
+}
+
+function updateRedirectUri() {
+  const url = getRedirectUri();
+  const r = document.getElementById('redirect-uri-display');
+  const f = document.getElementById('final-url-display');
+  if (r) r.textContent = url;
+  if (f) f.textContent = url;
+}
+
+// ── Copy knoppen ─────────────────────────────────────────────────────────
+function setupCopyButton(btnId, getText) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(getText());
+      btn.classList.add('copied');
+      const icon = btn.querySelector('.material-symbols-outlined');
+      const original = icon.textContent;
+      icon.textContent = 'check';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        icon.textContent = original;
+      }, 1200);
+    } catch (e) {}
+  };
+}
+
+setupCopyButton('copy-redirect', () => getRedirectUri());
+setupCopyButton('copy-final', () => getRedirectUri());
+
+// ── Client ID validatie ──────────────────────────────────────────────────
+function isValidClientId(id) {
+  return typeof id === 'string' && /^[a-f0-9]{32}$/i.test(id.trim());
+}
+
+const clientInput = document.getElementById('client-id-input');
+const clientNext = document.getElementById('client-next');
+const inputStatus = document.getElementById('input-status');
+const inputStatusIcon = document.getElementById('input-status-icon');
+const clientHint = document.getElementById('client-id-hint');
+
+clientInput.addEventListener('input', () => {
+  const val = clientInput.value.trim();
+  clientId = val;
+
+  const valid = isValidClientId(val);
+  const hasValue = val.length > 0;
+
+  if (valid) {
+    clientInput.classList.remove('invalid');
+    inputStatus.classList.add('visible');
+    inputStatus.classList.remove('error');
+    inputStatusIcon.textContent = 'check_circle';
+    clientHint.textContent = 'Looks good!';
+    clientHint.style.color = '#b48cff';
+    clientNext.disabled = false;
+  } else if (hasValue) {
+    clientInput.classList.add('invalid');
+    inputStatus.classList.add('visible');
+    inputStatus.classList.add('error');
+    inputStatusIcon.textContent = 'error';
+    clientHint.textContent = 'Client ID should be 32 hex characters.';
+    clientHint.style.color = '#ff5555';
+    clientNext.disabled = true;
+  } else {
+    clientInput.classList.remove('invalid');
+    inputStatus.classList.remove('visible', 'error');
+    clientHint.textContent = "You'll find this on your app's page, right under the app name.";
+    clientHint.style.color = '#6d6580';
+    clientNext.disabled = true;
+  }
+});
+
+clientInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !clientNext.disabled) {
+    nextSlide();
+  }
+});
+
+// ── Finish ───────────────────────────────────────────────────────────────
+async function finishSetup() {
+  if (!selectedPort || !portAvailable || !isValidClientId(clientId)) return;
+
+  document.getElementById('loading').classList.add('visible');
+
+  // Ook nog in localStorage (voor het geval de poort niet wijzigt)
+  try {
+    localStorage.setItem('sp_client_id', clientId.trim());
+    localStorage.setItem('sp_port', String(selectedPort));
+  } catch (e) {}
+
+  if (window.electronAPI && window.electronAPI.setupComplete) {
+    window.electronAPI.setupComplete({
+      port: selectedPort,
+      clientId: clientId.trim(),
+      showInDock: settings.showInDock,
+      startMinimized: settings.startMinimized,
+      launchAtLogin: settings.launchAtLogin
+    });
+  } else {
+    setTimeout(() => {
+      window.location.href = getRedirectUri() + 'spotify.html?cid=' + encodeURIComponent(clientId.trim());
+    }, 600);
+  }
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,53 @@
+{
+  "name": "vinyl-player",
+  "productName": "Vinyl Player",
+  "version": "1.0.0",
+  "description": "Spotify, reimagined as a real turntable.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac",
+    "build:dir": "electron-builder --mac --dir"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.vinylplayer.app",
+    "productName": "Vinyl Player",
+    "files": [
+      "main.js",
+      "preload.js",
+      "public/**/*",
+      "assets/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "build/icon.png",
+      "extendInfo": {
+        "LSUIElement": true
+      },
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        },
+        {
+          "target": "zip",
+          "arch": ["universal"]
+        }
+      ]
+    },
+    "dmg": {
+      "sign": false
+    }
+  }
+}

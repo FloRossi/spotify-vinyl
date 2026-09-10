@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Widget</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+html {
+  font-size: calc(16px * var(--scale-factor, 1));
+}
+
+html, body {
+  width:100%; height:100%;
+  overflow:hidden;
+  background:transparent;
+  display:flex; align-items:center; justify-content:center;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  user-select:none;
+  touch-action:none;
+}
+
+#widget-container {
+  position:relative;
+  width:100%; height:100%;
+  display:flex; flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding: calc(20px * var(--scale-factor)) calc(12px * var(--scale-factor)) calc(28px * var(--scale-factor)) calc(12px * var(--scale-factor));
+}
+
+/* ── Move mode ──────────────────────────────────────────────────────── */
+body.move-mode,
+body.move-mode #widget-container,
+body.move-mode #widget-container * {
+  -webkit-app-region: drag !important;
+  pointer-events: none !important;
+  cursor: grabbing !important;
+}
+
+body.move-mode #widget-container::before {
+  content: '';
+  position: absolute;
+  inset: calc(4px * var(--scale-factor));
+  border: 2px dashed rgba(255,255,255,0.6);
+  border-radius: calc(16px * var(--scale-factor));
+  pointer-events: none;
+  z-index: 9998;
+  animation: borderPulse 1.6s ease-in-out infinite;
+}
+@keyframes borderPulse {
+  0%, 100% { border-color: rgba(255,255,255,0.6); }
+  50%      { border-color: rgba(255,255,255,0.25); }
+}
+
+/* ── Move hint ──────────────────────────────────────────────────────── */
+#move-hint {
+  position: absolute;
+  top: calc(8px * var(--scale-factor));
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  color: #ffffff;
+  font-size: calc(9px * var(--scale-factor));
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 9999;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  text-transform: uppercase;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+body.move-mode #move-hint {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Vinyl ──────────────────────────────────────────────────────────── */
+#vinyl-wrap {
+  position:relative;
+  width: calc(180px * var(--scale-factor));
+  height: calc(180px * var(--scale-factor));
+  flex-shrink: 0;
+  cursor:grab;
+  filter:drop-shadow(0 calc(10px * var(--scale-factor)) calc(28px * var(--scale-factor)) rgba(0,0,0,0.55));
+}
+#vinyl-wrap.grabbing { cursor:grabbing; }
+
+@keyframes tapPulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+#vinyl-wrap.tap-pulse { animation: tapPulse 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Buitenste element: alleen rotatie, draait altijd door */
+#vinyl-outer {
+  width:100%; height:100%;
+  will-change: transform;
+  transform: rotate(0deg);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Binnenste element: alleen scale + opacity animaties via Web Animations API */
+#vinyl {
+  width:100%; height:100%; border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 50%,
+      transparent 0%, transparent 27%,
+      rgba(255,255,255,0.03) 27.5%, rgba(0,0,0,0.65) 28.5%,
+      rgba(255,255,255,0.025) 30%,  rgba(0,0,0,0.55) 31.5%,
+      rgba(255,255,255,0.02) 33.5%, rgba(0,0,0,0.55) 35%,
+      rgba(255,255,255,0.015) 37.5%,rgba(0,0,0,0.55) 39%,
+      rgba(255,255,255,0.015) 42%,  rgba(0,0,0,0.6)  44%,
+      rgba(255,255,255,0.01) 47%,   rgba(0,0,0,0.7)  49%,
+      rgba(0,0,0,0.9) 100%
+    ), #080808;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  position:relative;
+}
+#vinyl::after {
+  content:''; position:absolute; inset:0; border-radius:50%;
+  background:conic-gradient(
+    from 100deg,
+    transparent 0%,rgba(255,255,255,0.05) 18%,
+    transparent 38%,rgba(255,255,255,0.02) 58%,transparent 78%
+  );
+  pointer-events:none;
+}
+
+#cover-art {
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:42%; height:42%;
+  border-radius:50%; overflow:hidden; background:#181818;
+  border:1px solid rgba(255,255,255,0.08);
+  pointer-events:none;
+  box-shadow:0 0 0 2px rgba(0,0,0,0.6),inset 0 0 8px rgba(0,0,0,0.8);
+}
+
+.cover-slot {
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit:cover; display:block;
+  border-radius:50%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+#cover-a { opacity:1; }
+#cover-b { opacity:0; }
+
+#vinyl-hole {
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width: calc(8px * var(--scale-factor)); height: calc(8px * var(--scale-factor)); border-radius:50%;
+  background:radial-gradient(circle,#121212 40%,#000000 100%);
+  pointer-events:none; z-index:10;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.05);
+}
+
+/* ── Track info overlay ─────────────────────────────────────────────── */
+#track-overlay {
+  position:absolute;
+  left:50%;
+  bottom: calc(52px * var(--scale-factor));
+  transform: translateX(-50%) translateY(calc(6px * var(--scale-factor)));
+  width: calc(200px * var(--scale-factor));
+  text-align:center;
+  color:#fff;
+  opacity:0;
+  pointer-events:none;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+  z-index: 50;
+}
+#track-overlay.visible {
+  opacity:1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#track-overlay-name {
+  font-size: calc(13px * var(--scale-factor));
+  font-weight:700;
+  color:#ffffff;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  letter-spacing:-0.005em;
+  line-height:1.2;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+#track-overlay-artist {
+  font-size: calc(11px * var(--scale-factor));
+  color:#b3b3b3;
+  font-weight:400;
+  margin-top: calc(2px * var(--scale-factor));
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  line-height:1.2;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+
+/* ── Seek label + bar ───────────────────────────────────────────────── */
+#seek-label {
+  position:absolute;
+  left:50%;
+  bottom: calc(34px * var(--scale-factor));
+  transform: translateX(-50%) translateY(0);
+  width: calc(200px * var(--scale-factor));
+  font-size: calc(11px * var(--scale-factor));
+  color:#b3b3b3;
+  font-weight:400;
+  letter-spacing:0.02em;
+  text-align:center;
+  opacity:0;
+  transition:opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+             transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  font-variant-numeric: tabular-nums;
+  will-change: opacity, transform;
+  pointer-events:none;
+}
+#seek-label.visible { opacity:1; }
+
+#seek-bar {
+  position:absolute;
+  left:50%;
+  bottom: calc(12px * var(--scale-factor));
+  transform: translateX(-50%) translateY(0);
+  width: calc(180px * var(--scale-factor));
+  height: calc(4px * var(--scale-factor));
+  background:rgba(255,255,255,0.25);
+  border-radius: calc(2px * var(--scale-factor));
+  overflow:hidden;
+  opacity: 0;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+             transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+  pointer-events:none;
+}
+#seek-bar.visible { opacity: 1; }
+
+#seek-fill {
+  height:100%;
+  background:#ffffff;
+  border-radius: calc(2px * var(--scale-factor));
+  width:0%;
+  transition: width 0.1s linear;
+}
+</style>
+</head>
+<body>
+<div id="widget-container">
+  <div id="vinyl-wrap">
+    <div id="vinyl-outer">
+      <div id="vinyl">
+        <div id="cover-art">
+          <img id="cover-a" class="cover-slot" src="" alt="">
+          <img id="cover-b" class="cover-slot" src="" alt="">
+        </div>
+        <div id="vinyl-hole"></div>
+      </div>
+    </div>
+  </div>
+  <div id="track-overlay">
+    <div id="track-overlay-name">—</div>
+    <div id="track-overlay-artist">—</div>
+  </div>
+  <div id="seek-label"></div>
+  <div id="seek-bar"><div id="seek-fill"></div></div>
+  <div id="move-hint">Press Space to exit move</div>
+</div>
+
+<script>
+// ── Scale factor uit URL parameter ───────────────────────────────────────
+(function applyScale() {
+  const params = new URLSearchParams(window.location.search);
+  const scale = parseFloat(params.get('scale')) || 100;
+  document.documentElement.style.setProperty('--scale-factor', (scale / 100).toString());
+})();
+
+const CLIENT_ID = '5b1058dcc1e0426ab45386c13e76f360';
+
+const lg = k => localStorage.getItem(k);
+const ls = (k,v) => localStorage.setItem(k,v);
+
+// ── Move-mode ────────────────────────────────────────────────────────────
+if (window.electronAPI && window.electronAPI.onWidgetMoveMode) {
+  window.electronAPI.onWidgetMoveMode((enabled) => {
+    document.body.classList.toggle('move-mode', !!enabled);
+  });
+  if (window.electronAPI.getWidgetMoveMode) {
+    window.electronAPI.getWidgetMoveMode().then((enabled) => {
+      document.body.classList.toggle('move-mode', !!enabled);
+    });
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && document.body.classList.contains('move-mode')) {
+    e.preventDefault();
+    if (window.electronAPI && window.electronAPI.toggleMoveMode) {
+      window.electronAPI.toggleMoveMode();
+    }
+  }
+});
+
+// ── Spotify auth ─────────────────────────────────────────────────────────
+let refreshPromise = null;
+
+async function refreshToken() {
+  const rt = lg('sp_refresh_token');
+  if (!rt) return null;
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: rt,
+          client_id: CLIENT_ID
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.access_token) return null;
+      ls('sp_access_token', d.access_token);
+      ls('sp_expires_at', Date.now() + (Number(d.expires_in) || 3600) * 1000);
+      if (d.refresh_token) ls('sp_refresh_token', d.refresh_token);
+      return d.access_token;
+    } catch (e) {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+async function getToken() {
+  const expiresAt = parseInt(lg('sp_expires_at') || '0', 10);
+  const accessToken = lg('sp_access_token');
+  if (!accessToken) return null;
+  if (Date.now() >= expiresAt - 60000) return await refreshToken();
+  return accessToken;
+}
+
+async function api(path, method='GET', body) {
+  const token = await getToken();
+  if (!token) return null;
+  const opts = { method, headers:{ Authorization:`Bearer ${token}` } };
+  if (body) { opts.body=JSON.stringify(body); opts.headers['Content-Type']='application/json'; }
+  const res = await fetch('https://api.spotify.com/v1'+path, opts);
+  if (res.status===204||res.status===202) return null;
+  if (!res.ok) return null;
+  try { return await res.json(); } catch { return null; }
+}
+
+const widgetContainer = document.getElementById('widget-container');
+const vinylWrap       = document.getElementById('vinyl-wrap');
+const vinylOuterEl    = document.getElementById('vinyl-outer');
+const vinylEl         = document.getElementById('vinyl');
+const coverA          = document.getElementById('cover-a');
+const coverB          = document.getElementById('cover-b');
+const seekBar         = document.getElementById('seek-bar');
+const seekFill        = document.getElementById('seek-fill');
+const seekLbl         = document.getElementById('seek-label');
+const trackOverlay    = document.getElementById('track-overlay');
+const trackOverlayName   = document.getElementById('track-overlay-name');
+const trackOverlayArtist = document.getElementById('track-overlay-artist');
+
+const syncChannel = new BroadcastChannel('vinyl-player-sync');
+
+// ── State ────────────────────────────────────────────────────────────────
+let currentAngle = 0;
+let lastTs = null;
+let isPlaying = false;
+let currentUri = '';
+let progressMs = 0;
+let durationMs = 0;
+let lastServerProgressMs = null;
+let trackSwitching = false;
+let pendingTrackSwitch = null;
+let isScrubbing = false;
+let currentTrackSnapshot = null;
+let overlayHideTimer = null;
+const DEG_PER_MS = (4 * 360) / 60000;
+
+const SEEK_JUMP_THRESHOLD = 1500;
+
+// ── Rotation loop ────────────────────────────────────────────────────────
+function rotLoop(ts) {
+  if (lastTs !== null && isPlaying && !isScrubbing) {
+    const deltaMs = ts - lastTs;
+    const safeDelta = Math.min(deltaMs, 100);
+    currentAngle += safeDelta * DEG_PER_MS;
+    progressMs += safeDelta;
+  }
+  lastTs = ts;
+  if (!isScrubbing) {
+    vinylOuterEl.style.transform = `rotate(${currentAngle}deg)`;
+  }
+  requestAnimationFrame(rotLoop);
+}
+requestAnimationFrame(rotLoop);
+
+// ── Cover crossfade ──────────────────────────────────────────────────────
+let activeCoverSlot = 'a';
+function crossfadeCover(newUrl) {
+  if (!newUrl) return;
+  const incoming = activeCoverSlot === 'a' ? coverB : coverA;
+  const outgoing = activeCoverSlot === 'a' ? coverA : coverB;
+
+  incoming.style.transition = 'opacity 0s';
+  incoming.style.opacity = '0';
+  incoming.src = newUrl;
+
+  incoming.onload = () => {
+    incoming.style.transition = 'opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+    outgoing.style.transition = 'opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+    incoming.style.opacity = '1';
+    outgoing.style.opacity = '0';
+    activeCoverSlot = activeCoverSlot === 'a' ? 'b' : 'a';
+  };
+}
+
+// ── Track overlay ────────────────────────────────────────────────────────
+function showTrackOverlay(name, artist, duration = 3200) {
+  if (!name) return;
+  trackOverlayName.textContent = name;
+  trackOverlayArtist.textContent = artist || '';
+  trackOverlay.classList.add('visible');
+
+  clearTimeout(overlayHideTimer);
+  if (duration !== Infinity) {
+    overlayHideTimer = setTimeout(() => {
+      trackOverlay.classList.remove('visible');
+    }, duration);
+  }
+}
+
+function hideTrackOverlay() {
+  clearTimeout(overlayHideTimer);
+  trackOverlay.classList.remove('visible');
+}
+
+// ── Track switch animatie ────────────────────────────────────────────────
+// Fase 1: krimp naar scale(0.65) + opacity 0
+// Wissel: cover + tekst updaten OP HET DIEPTEPUNT (onzichtbaar)
+// Fase 2: groei terug naar scale(1) + opacity 1
+async function animateTrackSwitch(track) {
+  if (trackSwitching) { pendingTrackSwitch = track; return; }
+  trackSwitching = true;
+
+  const img = track.album?.images?.[0]?.url || '';
+  const name = track.name;
+  const artist = track.artists?.map(a=>a.name).join(', ') || '';
+
+  const outAnim = vinylEl.animate([
+    { transform: 'scale(1)',    opacity: 1 },
+    { transform: 'scale(0.65)', opacity: 0 }
+  ], {
+    duration: 280,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    fill: 'forwards'
+  });
+
+  await outAnim.finished;
+
+  // Dieptepunt: vinyl is onzichtbaar, wissel nu alles
+  if (img) crossfadeCover(img);
+  showTrackOverlay(name, artist);
+
+  const inAnim = vinylEl.animate([
+    { transform: 'scale(0.65)', opacity: 0 },
+    { transform: 'scale(1.05)', opacity: 1, offset: 0.55 },
+    { transform: 'scale(0.98)', opacity: 1, offset: 0.8 },
+    { transform: 'scale(1)',    opacity: 1 }
+  ], {
+    duration: 420,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    fill: 'forwards'
+  });
+
+  await inAnim.finished;
+
+  outAnim.cancel();
+  inAnim.cancel();
+
+  trackSwitching = false;
+  if (pendingTrackSwitch) {
+    const next = pendingTrackSwitch;
+    pendingTrackSwitch = null;
+    animateTrackSwitch(next);
+  }
+}
+
+// ── Seek bar ─────────────────────────────────────────────────────────────
+let seekHideTimer = null;
+
+function fmt(ms) {
+  const s = Math.round(ms/1000);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+function showSeekBar(posMs) {
+  seekBar.classList.add('visible');
+  seekLbl.classList.add('visible');
+  if (durationMs > 0) seekFill.style.width = Math.min(100, (posMs / durationMs) * 100) + '%';
+  seekLbl.textContent = fmt(posMs) + (durationMs ? ' / ' + fmt(durationMs) : '');
+  clearTimeout(seekHideTimer);
+  seekHideTimer = setTimeout(() => {
+    if (!isScrubbing) {
+      seekBar.classList.remove('visible');
+      seekLbl.classList.remove('visible');
+    }
+  }, 2000);
+}
+
+function updateSeekVisual() {
+  if (durationMs > 0) {
+    seekFill.style.width = Math.min(100, (progressMs / durationMs) * 100) + '%';
+  }
+}
+
+// ── State polling ────────────────────────────────────────────────────────
+async function fetchState() {
+  if (isScrubbing) return;
+
+  const data = await api('/me/player');
+  if (!data) return;
+
+  const wasPlaying = isPlaying;
+  isPlaying = data.is_playing;
+
+  const serverProgress = data.progress_ms || 0;
+  const expectedProgress = progressMs;
+  const jump = Math.abs(serverProgress - expectedProgress);
+
+  if (lastServerProgressMs !== null && jump > SEEK_JUMP_THRESHOLD) {
+    progressMs = serverProgress;
+    currentAngle = (progressMs / 1000) / (60 / 4) * 360;
+  } else if (jump > 300) {
+    progressMs = serverProgress;
+  }
+
+  lastServerProgressMs = serverProgress;
+  durationMs = data.item?.duration_ms || 0;
+  updateSeekVisual();
+
+  const track = data.item;
+  if (!track) return;
+
+  currentTrackSnapshot = {
+    name: track.name,
+    artist: track.artists?.map(a=>a.name).join(', ') || '',
+    coverUrl: track.album?.images?.[0]?.url || ''
+  };
+
+  if (track.uri !== currentUri) {
+    const prevUri = currentUri;
+    currentUri = track.uri;
+    if (prevUri) {
+      animateTrackSwitch(track);
+    } else {
+      const img = track.album?.images?.[0]?.url || '';
+      if (img) crossfadeCover(img);
+      showTrackOverlay(track.name, track.artists?.map(a=>a.name).join(', ') || '');
+    }
+    return;
+  }
+
+  if (wasPlaying && !isPlaying) {
+    showTrackOverlay(track.name, track.artists?.map(a=>a.name).join(', ') || '', Infinity);
+  } else if (!wasPlaying && isPlaying) {
+    hideTrackOverlay();
+  }
+}
+
+fetchState();
+setInterval(fetchState, 1200);
+
+// ── Vinyl interaction ────────────────────────────────────────────────────
+const SCR_DELAY   = 180;
+const TAP_MAX_PX  = 10;
+const SECS_PER_REV = (60 / 4);
+const DEG_TO_MS    = (SECS_PER_REV * 1000) / 360;
+
+let gestureState   = 'IDLE';
+let scrubTimer     = null;
+let scrubOffsetDeg = 0;
+let prevAngle      = 0;
+let cumulativePx   = 0;
+let lastMoveX      = 0;
+let lastMoveY      = 0;
+let tapCount       = 0;
+let tapTimer       = null;
+
+function centreOf(el) {
+  const r = el.getBoundingClientRect();
+  return { x: r.left+r.width/2, y: r.top+r.height/2 };
+}
+function angleTo(cx,cy,px,py) { return Math.atan2(py-cy,px-cx)*180/Math.PI; }
+function deltaAngle(prev,cur) {
+  let d = cur-prev;
+  while (d> 180) d-=360;
+  while (d<-180) d+=360;
+  return d;
+}
+function pt(e) { return e.touches ? e.touches[0] : e; }
+
+function enterScrub() {
+  gestureState = 'SCRUBBING';
+  isScrubbing  = true;
+  scrubOffsetDeg = 0;
+  vinylWrap.classList.add('grabbing');
+  showSeekBar(progressMs);
+}
+
+function onDown(e) {
+  if (document.body.classList.contains('move-mode')) return;
+  if (!e.target.closest('#vinyl-wrap')) return;
+  e.preventDefault();
+  if (gestureState !== 'IDLE') return;
+  if (trackSwitching) return;
+
+  const p = pt(e);
+  const c = centreOf(vinylEl);
+  prevAngle    = angleTo(c.x, c.y, p.clientX, p.clientY);
+  lastMoveX    = p.clientX;
+  lastMoveY    = p.clientY;
+  cumulativePx = 0;
+  gestureState = 'DOWN';
+
+  clearTimeout(scrubTimer);
+  scrubTimer = setTimeout(enterScrub, SCR_DELAY);
+}
+
+function onMove(e) {
+  if (document.body.classList.contains('move-mode')) return;
+  if (gestureState === 'IDLE') return;
+  e.preventDefault();
+
+  const p  = pt(e);
+  const dx = p.clientX - lastMoveX;
+  const dy = p.clientY - lastMoveY;
+  cumulativePx += Math.sqrt(dx*dx+dy*dy);
+  lastMoveX = p.clientX;
+  lastMoveY = p.clientY;
+
+  const c   = centreOf(vinylEl);
+  const ang = angleTo(c.x, c.y, p.clientX, p.clientY);
+  const d   = deltaAngle(prevAngle, ang);
+  prevAngle = ang;
+
+  if (gestureState === 'DOWN' && cumulativePx > TAP_MAX_PX) {
+    clearTimeout(scrubTimer);
+    enterScrub();
+  }
+
+  if (gestureState !== 'SCRUBBING') return;
+
+  scrubOffsetDeg += d;
+  currentAngle += d;
+  vinylOuterEl.style.transform = `rotate(${currentAngle}deg)`;
+
+  const previewMs = Math.max(0, Math.min(durationMs||Infinity, progressMs + scrubOffsetDeg*DEG_TO_MS));
+  showSeekBar(previewMs);
+
+  syncChannel.postMessage({
+    type: 'scrub-preview',
+    angle: currentAngle,
+    progressMs: previewMs,
+    durationMs,
+    track: currentTrackSnapshot
+  });
+}
+
+async function onUp(e) {
+  if (document.body.classList.contains('move-mode')) return;
+  if (gestureState === 'IDLE') return;
+  e.preventDefault();
+  clearTimeout(scrubTimer);
+  vinylWrap.classList.remove('grabbing');
+
+  if (gestureState === 'DOWN') {
+    gestureState = 'IDLE';
+    tapCount++;
+
+    vinylWrap.classList.remove('tap-pulse');
+    void vinylWrap.offsetWidth;
+    vinylWrap.classList.add('tap-pulse');
+    vinylWrap.addEventListener('animationend', () => vinylWrap.classList.remove('tap-pulse'), { once: true });
+
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(async () => {
+      const n = tapCount; tapCount = 0;
+      if (n === 1) {
+        if (isPlaying) { await api('/me/player/pause','PUT'); isPlaying = false; }
+        else { await api('/me/player/play','PUT'); isPlaying = true; }
+      } else {
+        await api('/me/player/next','POST');
+        setTimeout(fetchState, 500);
+      }
+    }, 240);
+  } else if (gestureState === 'SCRUBBING') {
+    gestureState = 'IDLE';
+    isScrubbing  = false;
+    const finalMs = Math.max(0, Math.min(durationMs||Infinity, progressMs + scrubOffsetDeg*DEG_TO_MS));
+    progressMs = finalMs;
+    currentAngle = (progressMs / 1000) / (60 / 4) * 360;
+    lastServerProgressMs = finalMs;
+    await api(`/me/player/seek?position_ms=${Math.round(finalMs)}`, 'PUT');
+    updateSeekVisual();
+    syncChannel.postMessage({ type: 'scrub-end' });
+    setTimeout(fetchState, 600);
+  }
+}
+
+window.addEventListener('mousedown',  onDown);
+window.addEventListener('mousemove',  onMove);
+window.addEventListener('mouseup',    onUp);
+window.addEventListener('touchstart', onDown, { passive:false });
+window.addEventListener('touchmove',  onMove, { passive:false });
+window.addEventListener('touchend',   onUp);
+window.addEventListener('blur', () => {
+  if (gestureState === 'SCRUBBING') {
+    gestureState = 'IDLE'; isScrubbing = false;
+    vinylWrap.classList.remove('grabbing');
+    clearTimeout(scrubTimer);
+  }
+});
+</script>
+</body>
+</html>
