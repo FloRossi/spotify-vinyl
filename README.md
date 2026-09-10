@@ -55,7 +55,7 @@ Download the latest `.dmg` from the [Releases](https://github.com/YOUR_USERNAME/
 ### Option 2 — Build from source
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/vinyl-player.git
+git clone https://github.com/FloRossi/spotify-vinyl.git
 cd vinyl-player
 npm install
 npm start
